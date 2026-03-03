@@ -1,0 +1,35 @@
+# Pulsar v1.0 — Requirements
+# Instalar en entorno virtual: pip install -r requirements.txt
+
+# Core
+streamlit>=1.43.0
+supabase>=2.10.0
+
+# Data
+pandas>=2.2.0,<3
+altair>=5.5.0
+
+# Payments
+stripe>=11.4.0
+
+# PDF
+reportlab>=4.2.0
+
+# Excel
+openpyxl>=3.1.0
+
+# Email
+sendgrid>=6.11.0
+
+# Validation
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+
+# Agents
+anthropic>=0.49.0
+
+# Resiliencia (retry en Supabase)
+tenacity>=8.1.0
+
+# Tests
+pytest>=7.0.0
