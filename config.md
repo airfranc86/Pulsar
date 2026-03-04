@@ -1,8 +1,8 @@
 # config.md — Referencia Técnica de Configuración
 
-> Pulsar v1.0 · Documento técnico operativo  
+> Pulsar v1.0 (release 1.3) · Documento técnico operativo  
 > Audiencia: desarrolladores, DevOps, onboarding de nuevos tenants  
-> Última actualización: Febrero 2026
+> Última actualización: Marzo 2026
 
 ---
 
@@ -541,5 +541,5 @@ MONITORING
 
 ---
 
-*Pulsar v1.0 — config.md · Documento técnico operativo*  
+*Pulsar — config.md · Documento técnico operativo*  
 *No crear documentos paralelos de configuración*

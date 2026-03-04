@@ -148,14 +148,21 @@ def get_anon_client() -> Any:
     """
     try:
         from config.settings import settings
+        if not settings.use_supabase:
+            raise DatabaseError(
+                "Supabase no está configurado. Definí SUPABASE_URL y SUPABASE_ANON_KEY "
+                "en .env o Streamlit Secrets, o quitá USE_SUPABASE=false."
+            )
         return _create_client_with_retry(
-            settings.SUPABASE_URL,
-            settings.SUPABASE_ANON_KEY,
+            settings.supabase.url,
+            settings.supabase.anon_key,
         )
     except ImportError:
         raise DatabaseError(
             "supabase-py no está instalado. Ejecutar: pip install supabase"
         )
+    except DatabaseError:
+        raise
     except Exception as exc:
         raise DatabaseError(f"No se pudo crear el cliente Supabase: {exc}") from exc
 
@@ -169,14 +176,21 @@ def get_service_client() -> Any:
     """
     try:
         from config.settings import settings
+        if not settings.use_supabase:
+            raise DatabaseError(
+                "Supabase no está configurado. Definí SUPABASE_URL y "
+                "SUPABASE_SERVICE_ROLE_KEY en .env o Streamlit Secrets."
+            )
         return _create_client_with_retry(
-            settings.SUPABASE_URL,
-            settings.SUPABASE_SERVICE_ROLE_KEY,
+            settings.supabase.url,
+            settings.supabase.service_role_key,
         )
     except ImportError:
         raise DatabaseError(
             "supabase-py no está instalado. Ejecutar: pip install supabase"
         )
+    except DatabaseError:
+        raise
     except Exception as exc:
         raise DatabaseError(
             f"No se pudo crear el cliente de servicio Supabase: {exc}"

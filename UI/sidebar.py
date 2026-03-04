@@ -40,8 +40,6 @@ def render_sidebar(
         _render_logo()
         st.divider()
         _render_tenant_info(t, active, demo_mode)
-        st.divider()
-        _render_nav_links(vl)
 
         if demo_mode or not active:
             st.divider()
@@ -57,10 +55,10 @@ def render_sidebar(
 def _render_logo() -> None:
     col_logo, col_name = st.columns([1, 3])
     with col_logo:
-        st.markdown("🔷")
+        st.image("assets/pulsar_192x192.png", use_container_width=True)
     with col_name:
         st.markdown("**Pulsar**")
-        st.caption("BusinessOps v1.0")
+        st.caption("BusinessOps v1.3")
 
 
 def _render_tenant_info(tenant: dict, active: bool, demo_mode: bool) -> None:
@@ -87,26 +85,6 @@ def _render_tenant_info(tenant: dict, active: bool, demo_mode: bool) -> None:
         )
 
 
-def _render_nav_links(vertical_labels: dict) -> None:
-    """
-    Muestra los links de navegación adaptados al vertical.
-    Streamlit maneja la navegación entre pages automáticamente;
-    esto es solo decorativo para orientar al usuario.
-    """
-    clientes_label = vertical_labels.get("clientes_label", "Clientes")
-    servicios_label = vertical_labels.get("servicios_label", "Servicios")
-    turnos_label = vertical_labels.get("turnos_label", "Turnos")
-
-    st.markdown("**Navegación**")
-    st.markdown(f"📊 Panel")
-    st.markdown(f"👥 {clientes_label}")
-    st.markdown(f"🛠️ {servicios_label}")
-    st.markdown(f"📅 {turnos_label}")
-    st.markdown(f"💰 Facturación")
-    st.markdown(f"📈 Analíticas")
-    st.markdown(f"🤖 Insights")
-
-
 def _render_upgrade_cta() -> None:
     st.markdown("**Activá tu cuenta**")
     st.caption("Accedé a todos los datos, reportes y funciones.")
@@ -114,4 +92,4 @@ def _render_upgrade_cta() -> None:
 
 
 def _render_footer() -> None:
-    st.caption("Pulsar · v1.0")
+    st.caption("Pulsar · v1.3")

@@ -1,5 +1,5 @@
 """
-Pulsar v1.0 — Gestión de Turnos
+Pulsar — Gestión de Turnos
 ==================================
 CRUD de turnos con filtros operativos.
 Multi-tenant obligatorio en todas las operaciones.
@@ -16,6 +16,7 @@ from UI.tablas import render_appointments_table
 from UI.sidebar import render_sidebar
 from config.constants import (
     APPOINTMENT_STATES,
+    DEMO_TENANT_ID,
     VERTICALS,
     CACHE_TTL_CLIENTS,
 )
@@ -28,8 +29,9 @@ from core.crud import (
     get_tenant,
 )
 from core.database import DatabaseError, get_anon_client
-from core.permisos import get_access_summary
+from core.permisos import get_access_summary, get_demo_tenant_fallback
 from core.validators import validate_appointment_payload
+from data.demo_data import get_demo_appointments, get_demo_clients, get_demo_services
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +41,6 @@ init_page("Turnos", "📅")
 def _get_tenant_id() -> str:
     tid = st.session_state.get("tenant_id")
     if not tid:
-        from config.constants import DEMO_TENANT_ID
         st.session_state["tenant_id"] = DEMO_TENANT_ID
         return DEMO_TENANT_ID
     return tid
@@ -59,13 +60,13 @@ def _load_tenant(tenant_id: str, _cache_version: int = 0) -> dict[str, Any]:
 @st.cache_data(ttl=CACHE_TTL_CLIENTS, show_spinner=False)
 def _load_services(tenant_id: str, _cache_version: int = 0) -> list[dict[str, Any]]:
     db = get_anon_client()
-    return list_services(db, tenant_id, activo=True)
+    return list_services(db, tenant_id, active_only=True)
 
 
 @st.cache_data(ttl=CACHE_TTL_CLIENTS, show_spinner=False)
 def _load_clients(tenant_id: str, _cache_version: int = 0) -> list[dict[str, Any]]:
     db = get_anon_client()
-    return list_clients(db, tenant_id, limit=200)
+    return list_clients(db, tenant_id, page=1, page_size=200)
 
 
 def main() -> None:
@@ -74,9 +75,8 @@ def main() -> None:
 
     try:
         tenant = _load_tenant(tenant_id, cache_ver)
-    except DatabaseError as exc:
-        render_connection_error(str(exc))
-        return
+    except DatabaseError:
+        tenant = get_demo_tenant_fallback(tenant_id)
 
     access = get_access_summary(tenant)
     demo = access["demo_mode"]
@@ -117,30 +117,57 @@ def main() -> None:
 
         try:
             db = get_anon_client()
-            turnos = list_appointments(
+            page_size = access.get("max_records_per_table") or 200
+            if page_size == -1:
+                page_size = 500
+            turnos_raw = list_appointments(
                 db,
                 tenant_id,
                 fecha_desde=fecha_desde,
                 fecha_hasta=fecha_hasta,
-                estados=estados_filtro or None,
-                limit=access["records_limit"] or 200,
+                page=1,
+                page_size=page_size,
             )
+            if estados_filtro:
+                turnos = [t for t in turnos_raw if t.get("estado") in estados_filtro]
+            else:
+                turnos = turnos_raw
             render_appointments_table(
                 turnos,
                 demo_mode=demo,
                 servicios_label=vertical_labels["servicios_label"],
             )
-        except DatabaseError as exc:
-            st.error(f"Error al cargar turnos: {exc}")
+        except DatabaseError:
+            if tenant_id == DEMO_TENANT_ID:
+                turnos_raw = get_demo_appointments(
+                    tenant_id,
+                    fecha_desde=fecha_desde,
+                    fecha_hasta=fecha_hasta,
+                )
+                if estados_filtro:
+                    turnos = [t for t in turnos_raw if t.get("estado") in estados_filtro]
+                else:
+                    turnos = turnos_raw
+                render_appointments_table(
+                    turnos,
+                    demo_mode=demo,
+                    servicios_label=vertical_labels["servicios_label"],
+                )
+            else:
+                st.error("Error al cargar turnos. Sin conexión a la base de datos.")
 
     # ─── Tab Nuevo Turno ───────────────────────────────────────────────────────
     with tab_nuevo:
         try:
             services = _load_services(tenant_id, cache_ver)
             clients = _load_clients(tenant_id, cache_ver)
-        except DatabaseError as exc:
-            st.error(f"Error al cargar datos: {exc}")
-            return
+        except DatabaseError:
+            if tenant_id == DEMO_TENANT_ID:
+                services = get_demo_services(tenant_id)
+                clients = get_demo_clients(tenant_id)
+            else:
+                st.error("Error al cargar datos. Sin conexión a la base de datos.")
+                return
 
         if not services:
             st.warning(f"No hay {vertical_labels['servicios_label'].lower()} activos. Creá uno primero en la sección Servicios.")

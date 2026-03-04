@@ -145,6 +145,30 @@ def render_services_table(
     st.dataframe(df, use_container_width=True, height=380, hide_index=True)
 
 
+def render_report_history_table(history: list[dict[str, Any]]) -> None:
+    """
+    Tabla de historial de reportes mensuales (period_label, envío, link).
+    """
+    if not history:
+        st.info("Aún no hay reportes generados.", icon="📄")
+        return
+
+    rows = []
+    for h in history:
+        sent_at = h.get("sent_at")
+        created_at = h.get("created_at")
+        rows.append(
+            {
+                "Período": h.get("period_label", "—"),
+                "Enviado a": h.get("sent_to_email") or "—",
+                "Enviado el": str(sent_at)[:10] if sent_at else "—",
+                "Creado": str(created_at)[:10] if created_at else "—",
+            }
+        )
+    df = pd.DataFrame(rows)
+    st.dataframe(df, use_container_width=True, height=min(400, 80 + len(rows) * 35), hide_index=True)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # IMPORT UPLOADER — Drag & Drop CSV/XLSX
 # ─────────────────────────────────────────────────────────────────────────────

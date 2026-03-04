@@ -90,6 +90,7 @@ class Settings:
     stripe: StripeSettings
     anthropic: AnthropicSettings
     app: AppSettings
+    use_supabase: bool
 
     @property
     def is_production(self) -> bool:
@@ -101,21 +102,25 @@ class Settings:
 
 
 def _load_settings() -> Settings:
+    # Supabase: opcional. Si USE_SUPABASE=false o no hay SUPABASE_URL, se desactiva.
+    use_supabase_env = (_optional("USE_SUPABASE", "true").strip().lower() == "true")
+    supabase_url = _optional("SUPABASE_URL", "")
+    use_supabase = use_supabase_env and bool(supabase_url)
     supabase = SupabaseSettings(
-        url=_require("SUPABASE_URL"),
-        anon_key=_require("SUPABASE_ANON_KEY"),
-        service_role_key=_require("SUPABASE_SERVICE_ROLE_KEY"),
+        url=supabase_url or "",
+        anon_key=_optional("SUPABASE_ANON_KEY", ""),
+        service_role_key=_optional("SUPABASE_SERVICE_ROLE_KEY", ""),
     )
     stripe = StripeSettings(
-        secret_key=_require("STRIPE_SECRET_KEY"),
-        publishable_key=_require("STRIPE_PUBLISHABLE_KEY"),
-        webhook_secret=_require("STRIPE_WEBHOOK_SECRET"),
-        price_id=_require("STRIPE_PRICE_ID"),
+        secret_key=_optional("STRIPE_SECRET_KEY", ""),
+        publishable_key=_optional("STRIPE_PUBLISHABLE_KEY", ""),
+        webhook_secret=_optional("STRIPE_WEBHOOK_SECRET", ""),
+        price_id=_optional("STRIPE_PRICE_ID", ""),
         success_url=_optional("STRIPE_SUCCESS_URL", "https://app.pulsar.com/success"),
         cancel_url=_optional("STRIPE_CANCEL_URL", "https://app.pulsar.com/upgrade"),
     )
     anthropic = AnthropicSettings(
-        api_key=_require("ANTHROPIC_API_KEY"),
+        api_key=_optional("ANTHROPIC_API_KEY", ""),
     )
     app = AppSettings(
         env=_optional("APP_ENV", "development"),
@@ -126,9 +131,15 @@ def _load_settings() -> Settings:
     )
     logger.info(
         "settings_loaded",
-        extra={"env": app.env, "demo_mode": app.demo_mode},
+        extra={"env": app.env, "demo_mode": app.demo_mode, "use_supabase": use_supabase},
     )
-    return Settings(supabase=supabase, stripe=stripe, anthropic=anthropic, app=app)
+    return Settings(
+        supabase=supabase,
+        stripe=stripe,
+        anthropic=anthropic,
+        app=app,
+        use_supabase=use_supabase,
+    )
 
 
 try:

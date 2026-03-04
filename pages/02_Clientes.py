@@ -1,5 +1,5 @@
 """
-Pulsar v1.0 — Gestión de Clientes
+Pulsar — Gestión de Clientes
 ====================================
 CRUD de clientes con búsqueda y paginación.
 Demo mode: limita registros visibles.
@@ -13,11 +13,12 @@ import streamlit as st
 from UI.layout import init_page, render_connection_error, render_page_header
 from UI.tablas import render_clients_table
 from UI.sidebar import render_sidebar
-from config.constants import VERTICALS, CACHE_TTL_CLIENTS
+from config.constants import DEMO_TENANT_ID, VERTICALS, CACHE_TTL_CLIENTS
 from core.crud import list_clients, create_client_record, get_tenant
 from core.database import DatabaseError, get_anon_client
-from core.permisos import get_access_summary
+from core.permisos import get_access_summary, get_demo_tenant_fallback
 from core.validators import validate_client_payload
+from data.demo_data import get_demo_clients
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,6 @@ init_page("Clientes", "👥")
 def _get_tenant_id() -> str:
     tid = st.session_state.get("tenant_id")
     if not tid:
-        from config.constants import DEMO_TENANT_ID
         st.session_state["tenant_id"] = DEMO_TENANT_ID
         return DEMO_TENANT_ID
     return tid
@@ -49,9 +49,8 @@ def main() -> None:
 
     try:
         tenant = _load_tenant(tenant_id, st.session_state.get("cache_version", 0))
-    except DatabaseError as exc:
-        render_connection_error(str(exc))
-        return
+    except DatabaseError:
+        tenant = get_demo_tenant_fallback(tenant_id)
 
     access = get_access_summary(tenant)
     demo = access["demo_mode"]
@@ -76,15 +75,30 @@ def main() -> None:
         search = st.text_input("🔍 Buscar por nombre", placeholder="Ingresá un nombre...")
         try:
             db = get_anon_client()
+            page_size = access.get("max_records_per_table") or 100
+            if page_size == -1:
+                page_size = 500
             clientes = list_clients(
                 db,
                 tenant_id,
-                limit=access["records_limit"] or 100,
+                page=1,
+                page_size=page_size,
                 search=search or None,
             )
             render_clients_table(clientes, demo_mode=demo)
-        except DatabaseError as exc:
-            st.error(f"Error al cargar clientes: {exc}")
+        except DatabaseError:
+            if tenant_id == DEMO_TENANT_ID:
+                clientes = get_demo_clients(tenant_id)
+                if search and search.strip():
+                    term = search.strip().lower()
+                    clientes = [
+                        c for c in clientes
+                        if term in (c.get("nombre") or "").lower()
+                        or term in (c.get("email") or "").lower()
+                    ]
+                render_clients_table(clientes, demo_mode=demo)
+            else:
+                st.error("Error al cargar clientes. Sin conexión a la base de datos.")
 
     with tab_nuevo:
         with st.form("form_nuevo_cliente"):

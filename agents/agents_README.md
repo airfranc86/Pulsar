@@ -2,11 +2,11 @@
 
 ## Agentes
 
-| Agente | Responsabilidad | Sandbox |
-|--------|----------------|---------|
-| Agent 01 | Product & KPI Designer | KPIs, pantallas, reporte mensual |
-| Agent 02 | Economic Analyst | Pricing, insights de mercado |
-| Agent 03 | SaaS Architect | Arquitectura técnica, infra |
+| Agente | Responsabilidad | Alcance |
+|--------|-----------------|---------|
+| Agent 01 | Product KPI Analyst | KPIs, pantallas, reporte mensual; narrativa sobre ingresos, ticket, ocupación, cancelaciones, clientes nuevos vs recurrentes |
+| Agent 02 | Economic Analyst | Pricing, insights de mercado; contextualiza KPIs con inflación, estacionalidad, sector |
+| Agent 03 | SaaS Architect / Operations Advisor | Arquitectura técnica, infra; recomendaciones operativas (ej. horarios con baja ocupación) |
 
 ## Uso
 

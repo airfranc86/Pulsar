@@ -1,11 +1,14 @@
 """
 config/constants.py
 ===================
-Constantes inmutables del sistema Pulsar v1.0.
+Constantes inmutables del sistema Pulsar.
 No dependen de variables de entorno.
 """
 from __future__ import annotations
 from typing import Final
+
+# ─── Versión de la aplicación (única fuente de verdad) ───────────────────────
+APP_VERSION: Final[str] = "1.3.0"
 
 # ─── Tenant demo ──────────────────────────────────────────────────────────────
 DEMO_TENANT_ID: Final[str] = "00000000-0000-0000-0000-000000000001"
@@ -117,6 +120,10 @@ BILLABLE_APPOINTMENT_STATES: Final[frozenset[str]] = frozenset(
 )
 # Alias usado en analytics y pages
 APPOINTMENT_STATES_BILLABLE: Final[frozenset[str]] = BILLABLE_APPOINTMENT_STATES
+# Estados que no generan ingreso ni ocupación (cancelado, no presentado)
+APPOINTMENT_STATES_NEGATIVE: Final[frozenset[str]] = frozenset(
+    {APPOINTMENT_CANCELLED, APPOINTMENT_NO_SHOW}
+)
 
 # ─── Ocupación (capacidad real para métrica) ───────────────────────────────────
 # Slots por día asumidos cuando el tenant no tiene configuración. Ajustar por vertical si hace falta.
@@ -130,6 +137,11 @@ DEMO_MAX_APPOINTMENTS_VISIBLE: Final[int] = 20
 # ─── Paginación ───────────────────────────────────────────────────────────────
 DEFAULT_PAGE_SIZE: Final[int] = 50
 MAX_PAGE_SIZE: Final[int] = 500
+
+# ─── Caché TTL (segundos) para @st.cache_data ──────────────────────────────────
+CACHE_TTL_CLIENTS: Final[int] = 120
+CACHE_TTL_SERVICES: Final[int] = 120
+CACHE_TTL_KPI: Final[int] = 60
 
 # ─── Stripe ───────────────────────────────────────────────────────────────────
 STRIPE_WEBHOOK_EVENTS: Final[frozenset[str]] = frozenset(

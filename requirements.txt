@@ -1,13 +1,19 @@
 # Pulsar v1.0 — Requirements
 # Instalar en entorno virtual: pip install -r requirements.txt
+#
+# Python: usar 3.11 o 3.12. Con 3.14 algunas dependencias transitivas
+# (p. ej. pyiceberg/pyroaring) no tienen wheels y exigen compilación C++
+# (Microsoft Visual C++ Build Tools en Windows).
 
 # Core
 streamlit>=1.43.0
-supabase>=2.10.0
+# Fijar <2.24 para evitar storage3 con pyiceberg/pyroaring (requieren C++ en Windows).
+supabase>=2.10.0,<2.24
 
 # Data
 pandas>=2.2.0,<3
-altair>=5.5.0
+# Fijar 5.4.1: 5.5+ usa TypedDict(closed=...) incompatible con Python 3.14.
+altair==5.4.1
 
 # Payments
 stripe>=11.4.0

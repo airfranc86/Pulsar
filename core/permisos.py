@@ -60,6 +60,35 @@ class AccessSummary(TypedDict):
     max_records_per_table: int
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def is_subscription_active(tenant: dict) -> bool:
+    """
+    Indica si el tenant tiene suscripción activa (acceso completo).
+    Usar desde pages que necesiten solo este booleano (ej. 08_Upgrade).
+    """
+    if not tenant or not isinstance(tenant, dict):
+        return False
+    status: str = tenant.get("subscription_status", "inactive")
+    return status in ACTIVE_STATUSES
+
+
+def get_demo_tenant_fallback(tenant_id: str) -> dict:
+    """
+    Devuelve un dict de tenant de ejemplo para uso cuando get_tenant() falla
+    (sin conexión a Supabase o tenant inexistente). Permite desarrollar sin backend.
+
+    No realiza llamadas a BD. Usar en app.py, 01_Panel y 08_Upgrade cuando tenant sea None/vacío.
+    """
+    from config.constants import DEMO_TENANT_ID, DEMO_TENANT_NAME
+    return {
+        "id": tenant_id,
+        "name": DEMO_TENANT_NAME,
+        "vertical": "pyme_servicios",
+        "subscription_status": "inactive",
+    }
+
+
 # ── Función principal ─────────────────────────────────────────────────────────
 
 def get_access_summary(tenant: dict) -> AccessSummary:
@@ -106,13 +135,10 @@ def get_access_summary(tenant: dict) -> AccessSummary:
             f"get_access_summary() esperaba dict, recibió {type(tenant).__name__!r}"
         )
 
-    if "subscription_status" not in tenant:
-        raise ValueError(
-            "El tenant no contiene 'subscription_status'. "
-            "Verificar que core/crud.get_tenant() retorna el campo completo."
-        )
-
-    status: str = tenant["subscription_status"]
+    # Si falta subscription_status (ej. get_tenant falló por red y se pasó {}), tratar como inactivo
+    status: str = tenant.get("subscription_status", "inactive")
+    if not status:
+        status = "inactive"
     is_active: bool = status in ACTIVE_STATUSES
 
     summary: AccessSummary = {

@@ -1,5 +1,5 @@
 """
-Pulsar v1.0 — Insights & Reportes
+Pulsar — Insights & Reportes
 =====================================
 Historial de reportes mensuales y trigger manual.
 Solo disponible en FULL_MODE.

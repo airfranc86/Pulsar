@@ -1,11 +1,11 @@
 """
-Pulsar v1.0 ? Panel de MÈtricas
+Pulsar Panel de Metrica
 ==================================
-P?gina principal: KPIs del perÌodo, gr·ficas de ingresos y operaciones.
-Orquesta: carga de datos ? c·lculo de KPIs ? rendering de UI.
+Pùgina principal: KPIs del perùodo, grùficas de ingresos y operaciones.
+Orquesta: carga de datos calculo de KPIs rendering de UI.
 
-Multi-tenant: tenant_id se obtiene de la sesiÛn. Toda query lo incluye.
-Demo mode: muestra KPIs limitados + banner de upgrade.
+Multi-tenant: tenant_id se obtiene de la sesiùn. Toda query lo incluye.
+Demo mode: muestra KPIs limitados banner de upgrade.
 """
 
 import logging
@@ -41,6 +41,7 @@ from config.constants import (
     APPOINTMENT_STATES_BILLABLE,
     APPOINTMENT_STATES_NEGATIVE,
     CACHE_TTL_KPI,
+    DEMO_TENANT_ID,
     SLOTS_POR_DIA_DEFAULT,
     VERTICALS,
 )
@@ -50,19 +51,19 @@ from core.crud import (
     get_tenant,
 )
 from core.database import DatabaseError, get_anon_client
-from core.permisos import get_access_summary, is_demo_mode
+from core.permisos import get_access_summary, get_demo_tenant_fallback
+from data.demo_data import get_demo_appointments, get_demo_services
 
 logger = logging.getLogger(__name__)
 
-# ??? Page config ??????????????????????????????????????????????????????????????
-init_page("Panel de MÈtricas", "??")
+# --- Page config ---
+init_page("Panel de Metrica", "??")
 
 
 def _get_session_tenant_id() -> str:
-    """Obtiene tenant_id de la sesiÛn. Falla limpiamente si no existe."""
+    """Obtiene tenant_id de la sesiùn. Falla limpiamente si no existe."""
     tenant_id = st.session_state.get("tenant_id")
     if not tenant_id:
-        from config.constants import DEMO_TENANT_ID
         tenant_id = DEMO_TENANT_ID
         st.session_state["tenant_id"] = tenant_id
     return tenant_id
@@ -70,7 +71,7 @@ def _get_session_tenant_id() -> str:
 
 @st.cache_data(ttl=CACHE_TTL_KPI, show_spinner=False)
 def _load_tenant_data(tenant_id: str) -> dict[str, Any]:
-    """Carga datos del tenant con cachÈ."""
+    """Carga datos del tenant con cache."""
     db = get_anon_client()
     return get_tenant(db, tenant_id) or {}
 
@@ -81,7 +82,7 @@ def _load_period_data(
     fecha_desde: str,
     fecha_hasta: str,
 ) -> dict[str, Any]:
-    """Carga turnos y servicios del perÌodo con cachÈ."""
+    """Carga turnos y servicios del perùodo con cache."""
     from datetime import date as date_cls
     db = get_anon_client()
 
@@ -89,9 +90,9 @@ def _load_period_data(
     fh = date_cls.fromisoformat(fecha_hasta)
 
     turnos = list_appointments(
-        db, tenant_id, fecha_desde=fd, fecha_hasta=fh, limit=500
+        db, tenant_id, fecha_desde=fd, fecha_hasta=fh, page_size=500
     )
-    services = list_services(db, tenant_id, activo=True)
+    services = list_services(db, tenant_id, active_only=True)
 
     return {"turnos": turnos, "services": services}
 
@@ -99,23 +100,21 @@ def _load_period_data(
 def main() -> None:
     tenant_id = _get_session_tenant_id()
 
-    # ?? Cargar tenant ?????????????????????????????????????????????????????????
+    # --- Cargar tenant ---
     try:
         tenant = _load_tenant_data(tenant_id)
-    except DatabaseError as exc:
-        render_connection_error(str(exc))
-        return
+    except DatabaseError:
+        tenant = get_demo_tenant_fallback(tenant_id)
 
     if not tenant:
-        st.error("Tenant no encontrado.")
-        st.stop()
+        tenant = get_demo_tenant_fallback(tenant_id)
 
     access = get_access_summary(tenant)
     demo = access["demo_mode"]
     vertical = tenant.get("vertical", "pyme_servicios")
     vertical_labels = VERTICALS.get(vertical, VERTICALS["pyme_servicios"])
 
-    # ?? Sidebar ???????????????????????????????????????????????????????????????
+    # --- Sidebar ---?
     render_sidebar(
         tenant,
         active=access["subscription_active"],
@@ -123,17 +122,17 @@ def main() -> None:
         vertical_labels=vertical_labels,
     )
 
-    # ?? Header ????????????????????????????????????????????????????????????????
+    # --- Header ---
     render_page_header(
-        f"Panel ? {tenant.get('name', '')}",
-        subtitle=f"{vertical_labels['label']} ∑ PerÌodo actual",
+        f"Panel de Metrica {tenant.get('name', '')}",
+        subtitle=f"{vertical_labels['label']} Perùodo actual",
         demo_mode=demo,
     )
 
     if demo:
         render_upgrade_banner()
 
-    # ?? Filtro de perÌodo ??????????????????????????????????????????????????????
+    # --- Filtro de perùodo ---
     hoy = date.today()
     col_f1, col_f2, _ = st.columns([2, 2, 6])
     with col_f1:
@@ -153,24 +152,34 @@ def main() -> None:
         st.warning("La fecha de inicio debe ser anterior a la de fin.")
         return
 
-    # ?? Cargar datos del perÌodo ???????????????????????????????????????????????
+    # --- Cargar datos del perùodo ---
     try:
-        with st.spinner("Cargando mÈtricas..."):
+        with st.spinner("Cargando mùtricas..."):
             period_data = _load_period_data(
                 tenant_id,
                 fecha_desde.isoformat(),
                 fecha_hasta.isoformat(),
             )
-    except DatabaseError as exc:
-        render_connection_error(str(exc))
-        return
+    except DatabaseError:
+        if tenant_id == DEMO_TENANT_ID:
+            period_data = {
+                "turnos": get_demo_appointments(
+                    tenant_id,
+                    fecha_desde=fecha_desde,
+                    fecha_hasta=fecha_hasta,
+                ),
+                "services": get_demo_services(tenant_id),
+            }
+        else:
+            render_connection_error("Sin conexiùn a la base de datos.")
+            return
 
     turnos = period_data["turnos"]
     services = period_data["services"]
     servicios_precio = {s["id"]: float(s.get("precio", 0)) for s in services}
     servicios_nombre = {s["id"]: s.get("nombre", "") for s in services}
 
-    # Cargar mes anterior para comparaciÛn
+    # Cargar mes anterior para comparaciùn
     prev_desde = (fecha_desde.replace(day=1) - timedelta(days=1)).replace(day=1)
     prev_hasta = fecha_desde.replace(day=1) - timedelta(days=1)
 
@@ -187,7 +196,7 @@ def main() -> None:
     except DatabaseError:
         prev_ingresos = 0.0
 
-    # ?? Calcular KPIs ??????????????????????????????????????????????????????????
+    # --- Calcular KPIs ---
     billable = [t for t in turnos if t.get("estado") in APPOINTMENT_STATES_BILLABLE]
     negativos = [t for t in turnos if t.get("estado") in APPOINTMENT_STATES_NEGATIVE]
     cancelados = [t for t in turnos if t.get("estado") == "cancelado"]
@@ -195,7 +204,7 @@ def main() -> None:
 
     ingresos = compute_ingresos_mensuales(billable, servicios_precio)
     ticket = compute_ticket_promedio(ingresos, len(billable))
-    # OcupaciÛn contra slots disponibles reales del perÌodo (no contra total turnos).
+    # Ocupaciùn contra slots disponibles reales del perùodo (no contra total turnos).
     dias_periodo = (fecha_hasta - fecha_desde).days + 1
     capacidad_slots = max(dias_periodo * SLOTS_POR_DIA_DEFAULT, 1)
     ocupacion = compute_ocupacion(len(billable), capacidad_slots)
@@ -207,7 +216,7 @@ def main() -> None:
         [{"client_id": cid} for cid in prev_client_ids],
     )
 
-    # ?? KPI Rows ???????????????????????????????????????????????????????????????
+    # --- KPI Rows ---
     st.subheader("?? Financiero")
     render_kpi_row_ingresos(ingresos, ticket, len(billable), comparacion)
 
@@ -226,7 +235,7 @@ def main() -> None:
         )
         st.divider()
 
-    # ?? Gr·ficas ???????????????????????????????????????????????????????????????
+    # --- Grùficas ---
     col_left, col_right = st.columns(2)
 
     with col_left:
@@ -235,7 +244,7 @@ def main() -> None:
             top_services,
             label_field="nombre",
             value_field="cantidad",
-            title=f"{vertical_labels['servicios_label']} m·s frecuentes",
+            title=f"{vertical_labels['servicios_label']} mùs frecuentes",
         )
 
     with col_right:
@@ -248,7 +257,7 @@ def main() -> None:
 
     if not demo:
         horas = compute_horas_pico(turnos)
-        render_horas_pico_heatmap(horas, title="Horas pico del perÌodo")
+        render_horas_pico_heatmap(horas, title="Horas pico del perùodo")
 
     logger.info(
         "panel_rendered",

@@ -20,6 +20,22 @@ Multi-tenant:
   - Con ?upgrade=true → redirige a upgrade page
 """
 
+# ─── Cargar .env con tolerancia a encoding (evita utf-8 decode error en Windows) ─
+import os
+_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+if os.path.isfile(_env_path):
+    try:
+        with open(_env_path, encoding="utf-8", errors="replace") as _f:
+            for _line in _f:
+                _line = _line.strip()
+                if _line and not _line.startswith("#") and "=" in _line:
+                    _key, _, _val = _line.partition("=")
+                    _key = _key.strip()
+                    if _key and _key not in os.environ:
+                        os.environ[_key] = _val.strip().strip('"').strip("'")
+    except OSError:
+        pass
+
 import logging
 
 import streamlit as st
@@ -33,11 +49,11 @@ logger = logging.getLogger(__name__)
 # ─── Configuración de página ──────────────────────────────────────────────────
 st.set_page_config(
     page_title="Pulsar — BusinessOps Dashboard",
-    page_icon="⚡",
+    page_icon="assets/pulsar_32x32.png",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        "About": "Pulsar v1.0 — BusinessOps Dashboard · Powered by Anthropic",
+        "About": "Pulsar v1.3 — BusinessOps Dashboard · Powered by Anthropic",
     },
 )
 
@@ -72,10 +88,8 @@ def _resolve_tenant_id() -> str:
 def _check_settings() -> bool:
     """
     Verifica que la configuración mínima esté cargada.
-    Muestra error amigable si faltan variables de entorno.
-
-    Returns:
-        True si la configuración es válida.
+    Con Supabase desactivado (USE_SUPABASE=false o sin SUPABASE_URL) la app arranca
+    y muestra instrucciones en lugar de fallar.
     """
     try:
         from config.settings import settings  # noqa: F401
@@ -100,6 +114,27 @@ def main() -> None:
     if not _check_settings():
         st.stop()
 
+    from config.settings import settings
+
+    # ── Supabase desactivado: mostrar instrucciones y no conectar ─────────────
+    if not settings.use_supabase:
+        st.info(
+            "⚡ **Supabase desactivado**\n\n"
+            "Para usar el dashboard configurá:\n\n"
+            "- **SUPABASE_URL** y **SUPABASE_ANON_KEY** en `.env` o en "
+            "Streamlit Secrets (`C:\\Users\\Francisco\\.streamlit\\secrets.toml` o "
+            "`.streamlit/secrets.toml` en el proyecto).\n\n"
+            "Para desactivar Supabase a propósito, no hace falta definir nada; "
+            "si querés forzar el modo sin backend, podés setear `USE_SUPABASE=false` en `.env`.",
+            icon="⚡",
+        )
+        st.caption(
+            "Paths válidos para secrets: "
+            "C:\\Users\\Francisco\\.streamlit\\secrets.toml — "
+            "D:\\Developer\\1Proyectos\\Pulsar v1.0\\.streamlit\\secrets.toml"
+        )
+        st.stop()
+
     # ── Resolver tenant ────────────────────────────────────────────────────────
     tenant_id = _resolve_tenant_id()
 
@@ -108,10 +143,24 @@ def main() -> None:
         st.switch_page("pages/08_Upgrade.py")
 
     # ── Cargar datos del tenant ────────────────────────────────────────────────
-    from core.crud import get_tenant
-    from core.database import DatabaseError, get_anon_client
-    from core.permisos import get_access_summary
-    from config.constants import VERTICALS
+    try:
+        from core.crud import get_tenant
+        from core.database import DatabaseError, get_anon_client
+        from core.permisos import get_access_summary, get_demo_tenant_fallback
+        from config.constants import VERTICALS
+    except ImportError as exc:
+        if "supabase" in str(exc).lower():
+            st.error(
+                "⚠️ **Falta el paquete Supabase**\n\n"
+                "En la carpeta del proyecto, activá el venv y ejecutá:\n\n"
+                "```bash\npip install supabase\n```\n\n"
+                "O instalá todas las dependencias:\n\n"
+                "```bash\npip install -r requirements.txt\n```",
+                icon="⚠️",
+            )
+        else:
+            st.error(f"Error al cargar módulos: {exc}")
+        st.stop()
 
     try:
         db = get_anon_client()
@@ -121,8 +170,12 @@ def main() -> None:
         st.stop()
 
     if not tenant:
-        st.error("Tenant no encontrado. Verificá la URL.")
-        st.stop()
+        tenant = get_demo_tenant_fallback(tenant_id)
+        st.info(
+            "Tenant de ejemplo (sin conexión a la base de datos). "
+            "Configurá SUPABASE_URL y SUPABASE_ANON_KEY para usar datos reales.",
+            icon="ℹ️",
+        )
 
     access = get_access_summary(tenant)
     demo = access["demo_mode"]

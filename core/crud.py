@@ -16,7 +16,7 @@ from typing import Any, Optional
 
 from supabase import Client  # type: ignore
 
-from core.database import assert_tenant as require_tenant
+from core.database import DatabaseError, assert_tenant as require_tenant
 from config.constants import (
     DEFAULT_PAGE_SIZE,
     MAX_PAGE_SIZE,
@@ -26,7 +26,7 @@ from config.constants import (
 logger = logging.getLogger(__name__)
 
 
-class CRUDError(Exception):
+class CRUDError(DatabaseError):
     """Error en operación CRUD."""
 
 
@@ -106,6 +106,78 @@ def update_tenant_subscription(
         return False
 
 
+# ─── REPORT HISTORY ───────────────────────────────────────────────────────────
+
+def list_report_history(
+    db: Client,
+    tenant_id: str,
+    limit: int = 12,
+) -> list[dict[str, Any]]:
+    """
+    Lista el historial de reportes mensuales del tenant (orden descendente por fecha).
+
+    Args:
+        db: Cliente Supabase.
+        tenant_id: UUID del tenant.
+        limit: Cantidad máxima de registros.
+
+    Returns:
+        Lista de dicts con period_label, storage_path, sent_to_email, sent_at, created_at.
+    """
+    tid = require_tenant(tenant_id)
+    try:
+        result = (
+            db.table("report_history")
+            .select("id, period_label, storage_path, sent_to_email, sent_at, created_at")
+            .eq("tenant_id", tid)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data or []
+    except Exception as exc:
+        logger.error(
+            "list_report_history_failed",
+            extra={"tenant_id": tid, "error": str(exc)},
+        )
+        return []
+
+
+def create_report_history_entry(
+    db: Client,
+    tenant_id: str,
+    data: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Crea una entrada en report_history (usado por scheduler/Edge Function).
+
+    Args:
+        db: Cliente Supabase (service_role).
+        tenant_id: UUID del tenant.
+        data: period_label, storage_path, sent_to_email (opcional), sent_at (opcional).
+
+    Returns:
+        dict con la fila insertada.
+    """
+    tid = require_tenant(tenant_id)
+    row = {
+        "tenant_id": tid,
+        "period_label": data.get("period_label", ""),
+        "storage_path": data.get("storage_path", ""),
+        "sent_to_email": data.get("sent_to_email"),
+        "sent_at": data.get("sent_at"),
+    }
+    try:
+        result = db.table("report_history").insert(row).execute()
+        return (result.data or [{}])[0]
+    except Exception as exc:
+        logger.error(
+            "create_report_history_entry_failed",
+            extra={"tenant_id": tid, "error": str(exc)},
+        )
+        raise CRUDError(f"Error creando entrada en report_history: {exc}") from exc
+
+
 # ─── CLIENTS ──────────────────────────────────────────────────────────────────
 
 def list_clients(
@@ -163,6 +235,17 @@ def create_client(db: Client, data: dict[str, Any]) -> dict[str, Any]:
     except Exception as exc:
         logger.error("create_client_failed", extra={"error": str(exc)})
         raise CRUDError(f"Error creando cliente: {exc}") from exc
+
+
+def create_client_record(
+    db: Client, tenant_id: str, data: dict[str, Any]
+) -> dict[str, Any]:
+    """
+    Alias para crear cliente inyectando tenant_id. Usado por pages/02_Clientes.
+    """
+    payload = dict(data)
+    payload["tenant_id"] = tenant_id
+    return create_client(db, payload)
 
 
 def update_client(

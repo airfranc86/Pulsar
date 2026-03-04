@@ -324,9 +324,10 @@ class TestClientesSupabase:
         """Crea settings falsos con las variables necesarias."""
         import unittest.mock as mock
         fake_settings = mock.MagicMock()
-        fake_settings.SUPABASE_URL = "https://test.supabase.co"
-        fake_settings.SUPABASE_ANON_KEY = "test-anon-key"
-        fake_settings.SUPABASE_SERVICE_ROLE_KEY = "test-service-key"
+        fake_settings.use_supabase = True
+        fake_settings.supabase.url = "https://test.supabase.co"
+        fake_settings.supabase.anon_key = "test-anon-key"
+        fake_settings.supabase.service_role_key = "test-service-key"
         return fake_settings
 
     def test_get_anon_client_retorna_cliente_cuando_supabase_instalado(self):

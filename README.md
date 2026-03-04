@@ -1,7 +1,7 @@
 # Pulsar v1.0 — MVP Blueprint
 **BusinessOps Dashboard · SaaS Multi-Vertical**
 *Documento operativo único · No crear documentos paralelos*
-*Versión: 1.0 · Objetivo: MVP vendible en 4 semanas*
+*Release: 1.3 · Objetivo: MVP vendible en 4 semanas*
 
 Fecha: 19-02-2026
 
@@ -17,6 +17,21 @@ No rediseñó el stack. No migró fuera de Supabase. No creó segundo repositori
 
 **Próximo paso único recomendado:**
 Ejecutar el bloque SQL de la Sección 3.1 (agregar `tenant_id` a tablas existentes + RLS) en el Supabase de producción actual antes de cualquier otra tarea.
+
+**Completado (remediación feb 2026):**
+- **Fase 1:** Corregido import `require_tenant` en crud y `payment_services`.
+- **Fase 2:** Seguridad — tenant por slug, JWT, `get_admin_client` para operaciones admin.
+- **Fase 3:** Lógica y UX — ocupación, singular/plural, precio Upgrade.
+- **Fase 4:** Caché quirúrgico, cliente fuera de caché, limpieza de imports.
+- **Fase 5:** Tests analytics, retry Supabase, `requirements.txt` actualizado.
+
+**Completado (marzo 2026):**
+- **Supabase opcional:** `USE_SUPABASE=false` o sin `SUPABASE_URL`; la app arranca y muestra instrucciones. Stripe/Anthropic también opcionales al inicio.
+- **Constantes de caché:** `CACHE_TTL_CLIENTS`, `CACHE_TTL_SERVICES`, `CACHE_TTL_KPI` en `config/constants.py`.
+- **Report history:** `list_report_history`, `create_report_history_entry` en `core/crud.py`; `render_report_history_table` en `UI/tablas.py`; pantalla Insights operativa.
+- **Permisos:** `is_subscription_active(tenant)` en `core/permisos.py` para Upgrade.
+- **Dependencias:** `supabase>=2.10.0,<2.24` (evitar pyiceberg); `altair>=5.4.0,<5.5` (Python 3.14). Python 3.11/3.12 recomendado en `requirements.txt`.
+- **Entorno:** Carga segura de `.env` (UTF-8 con `errors="replace"`); mensaje claro si falta el paquete `supabase`.
 
 ---
 
@@ -338,8 +353,8 @@ src/billing/stripe_checkout.py
     mode="subscription",
     price=STRIPE_PRICE_ID,
     client_reference_id=tenant_id,
-    success_url=APP_URL + "?activated=true",
-    cancel_url=APP_URL + "?cancelled=true"
+    success_url=APP_BASE_URL + "?activated=true",
+    cancel_url=APP_BASE_URL + "?cancelled=true"
   )
     │
     ▼
@@ -378,7 +393,7 @@ from src.db.tenants import get_tenant
 
 stripe.api_key = st.secrets["STRIPE_SECRET_KEY"]
 STRIPE_PRICE_ID = st.secrets["STRIPE_PRICE_ID"]
-APP_URL = st.secrets["APP_URL"]
+APP_BASE_URL = st.secrets["APP_BASE_URL"]
 
 def create_checkout_session(tenant_id: str) -> str:
     """Crea una Stripe Checkout Session y retorna la URL de pago."""
@@ -388,8 +403,8 @@ def create_checkout_session(tenant_id: str) -> str:
         line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
         client_reference_id=tenant_id,
         customer_email=tenant["email"],
-        success_url=f"{APP_URL}?activated=true",
-        cancel_url=f"{APP_URL}?cancelled=true",
+        success_url=f"{APP_BASE_URL}?activated=true",
+        cancel_url=f"{APP_BASE_URL}?cancelled=true",
     )
     return session.url
 
@@ -491,7 +506,7 @@ SUPABASE_URL = "https://xxx.supabase.co"
 SUPABASE_ANON_KEY = "eyJ..."
 STRIPE_SECRET_KEY = "sk_live_..."
 STRIPE_PRICE_ID = "price_..."
-APP_URL = "https://pulsar.streamlit.app"
+APP_BASE_URL = "https://pulsar.streamlit.app"
 
 # Supabase Edge Function secrets (Dashboard → Settings → Edge Functions)
 STRIPE_SECRET_KEY = "sk_live_..."
@@ -929,6 +944,8 @@ supabase secrets set RESEND_API_KEY=re_...
 
 ## Estructura del proyecto (árbol de directorios)
 
+*(No existe `01_Panel.py`; el entry point es `app.py` y la primera página es 02_Clientes.)*
+
 ```
 Pulsar v1.0/
 ├── .gitignore
@@ -974,13 +991,13 @@ Pulsar v1.0/
 │   ├── README.md
 │   └── stripe_client.py
 ├── pages/
-│   ├── 01_Panel.py
 │   ├── 02_Clientes.py
 │   ├── 03_Servicios.py
 │   ├── 04_Turnos.py
 │   ├── 05_Facturacion.py
 │   ├── 06_Analiticas.py
-│   └── 07_Insights.py
+│   ├── 07_Insights.py
+│   └── 08_Upgrade.py
 ├── services/
 │   ├── export_services.py
 │   ├── import_services.py

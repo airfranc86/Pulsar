@@ -1,5 +1,5 @@
 """
-Pulsar v1.0 — Facturación
+Pulsar — Facturación
 ===========================
 Vista de ingresos y resumen de facturación del período.
 Exportación disponible solo en FULL_MODE.
@@ -14,11 +14,12 @@ import streamlit as st
 
 from UI.layout import init_page, render_connection_error, render_page_header
 from UI.sidebar import render_sidebar
-from config.constants import APPOINTMENT_STATES_BILLABLE, VERTICALS, CACHE_TTL_KPI
+from config.constants import APPOINTMENT_STATES_BILLABLE, DEMO_TENANT_ID, VERTICALS, CACHE_TTL_KPI
 from core.crud import list_appointments, list_services, get_tenant
 from core.database import DatabaseError, get_anon_client
-from core.permisos import get_access_summary
+from core.permisos import get_access_summary, get_demo_tenant_fallback
 from services.export_services import export_to_csv, export_to_excel, get_export_filename
+from data.demo_data import get_demo_appointments, get_demo_services
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ init_page("Facturación", "💰")
 def _get_tenant_id() -> str:
     tid = st.session_state.get("tenant_id")
     if not tid:
-        from config.constants import DEMO_TENANT_ID
+        st.session_state["tenant_id"] = DEMO_TENANT_ID
         return DEMO_TENANT_ID
     return tid
 
@@ -44,9 +45,8 @@ def main() -> None:
 
     try:
         tenant = _load_tenant(tenant_id)
-    except DatabaseError as exc:
-        render_connection_error(str(exc))
-        return
+    except DatabaseError:
+        tenant = get_demo_tenant_fallback(tenant_id)
 
     access = get_access_summary(tenant)
     demo = access["demo_mode"]
@@ -69,17 +69,27 @@ def main() -> None:
 
     try:
         db = get_anon_client()
-        turnos = list_appointments(
+        turnos_raw = list_appointments(
             db, tenant_id,
             fecha_desde=fecha_desde,
             fecha_hasta=fecha_hasta,
-            estados=list(APPOINTMENT_STATES_BILLABLE),
-            limit=500,
+            page=1,
+            page_size=500,
         )
+        turnos = [t for t in turnos_raw if t.get("estado") in APPOINTMENT_STATES_BILLABLE]
         services = list_services(db, tenant_id)
-    except DatabaseError as exc:
-        st.error(str(exc))
-        return
+    except DatabaseError:
+        if tenant_id == DEMO_TENANT_ID:
+            turnos_raw = get_demo_appointments(
+                tenant_id,
+                fecha_desde=fecha_desde,
+                fecha_hasta=fecha_hasta,
+            )
+            turnos = [t for t in turnos_raw if t.get("estado") in APPOINTMENT_STATES_BILLABLE]
+            services = get_demo_services(tenant_id)
+        else:
+            st.error("Sin conexión a la base de datos.")
+            return
 
     servicios_info = {s["id"]: s for s in services}
 

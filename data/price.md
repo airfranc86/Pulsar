@@ -1,41 +1,44 @@
-Pricing Premium basado en IA
+# Pricing Premium basado en IA
 
-Vamos a analizarlo fríamente.
+> **Alcance:** Propuesta de precios en **ARS para mercado argentino/regional**. Los planes del producto en USD (Demo / Básico USD 19 / Pro USD 39) se documentan en README y PR.md.
 
-Mercado actual:
-20.000–50.000 ARS mensual promedio
+## Análisis de mercado
 
-Si sos uno más → 30k ARS techo.
+**Rango actual:** 20.000–50.000 ARS/mes (promedio).
 
-Pero si realmente resolvés:
+- Si competís como “uno más” → techo ~30.000 ARS.
+- Si demostrás impacto concreto en negocio → margen para premium.
 
-Rentabilidad
+---
 
-Fuga de clientes
+## Propuesta de valor (no por “IA”, sino por impacto)
 
-Optimización agenda
+El premium se justifica **por impacto en facturación**, no por la tecnología en sí.
 
-Podés posicionarte así:
+Si el sistema ayuda a aumentar ~8% los ingresos, **se paga solo**.
 
-Plan Core
+Métricas que respaldan el precio:
 
-Gestión básica + KPIs
-ARS 35.000
+- **Rentabilidad** (márgenes, costos, mix).
+- **Retención** (menos fuga de clientes).
+- **Optimización de agenda** (uso del tiempo y capacidad).
 
-Plan Intelligence
+---
 
-Multiagente activo + reportes estratégicos
-ARS 55.000–65.000
+## Planes sugeridos
 
-Plan Growth
+| Plan | Incluye | Precio (ARS/mes) |
+|------|--------|-------------------|
+| **Core** | Gestión básica + KPIs | 35.000 |
+| **Intelligence** | Multiagente activo + reportes estratégicos | 55.000–65.000 |
+| **Growth** | Multi-sucursal + automatizaciones avanzadas | 90.000+ |
 
-Multi-sucursal + automatizaciones avanzadas
-ARS 90.000+
+---
 
-Lo importante:
+## Resumen
 
-El premium no se justifica por IA.
-Se justifica por impacto en facturación.
+- **Core:** entrada al producto con métricas claras.
+- **Intelligence:** diferenciación por insights y reportes accionables.
+- **Growth:** escalado para operaciones con varias sucursales y flujos automatizados.
 
-Si el sistema ayuda a aumentar 8% ingresos,
-se paga solo.
+El precio se sostiene cuando el cliente ve el vínculo directo entre el uso del sistema y mejoras en ingresos o eficiencia.

@@ -1,5 +1,5 @@
 """
-Pulsar v1.0 — Upgrade / Checkout
+Pulsar — Upgrade / Checkout
 ===================================
 Pantalla de upgrade para tenants en demo mode.
 Crea Stripe Checkout Session y redirige.
@@ -13,7 +13,7 @@ import streamlit as st
 from UI.layout import init_page, render_page_header
 from core.crud import get_tenant
 from core.database import DatabaseError, get_anon_client
-from core.permisos import is_subscription_active
+from core.permisos import get_demo_tenant_fallback, is_subscription_active
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +39,7 @@ def main() -> None:
         return
 
     if not tenant:
-        st.error("Tenant no encontrado.")
-        return
+        tenant = get_demo_tenant_fallback(tenant_id)
 
     if is_subscription_active(tenant):
         st.success("✅ Tu cuenta ya está activa. Tenés acceso completo a Pulsar.")

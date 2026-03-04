@@ -1,6 +1,7 @@
 # Pulsar v1.0 MVP Blueprint
 
-> Documento técnico único. Fuente de verdad del proyecto.
+> Documento técnico único. Fuente de verdad del proyecto.  
+> **Release: 1.3** · Marzo 2026
 
 ---
 
@@ -56,7 +57,7 @@ app.py (entry point)
 
 ## 3. Cambios mínimos para multi-tenant
 
-1. **Base de Datos (Supabase):** Ejecutar el script SQL para añadir la columna `tenant_id` (UUID) a todas las tablas existentes (`clients`, `services`, `appointments`, `invoices`) y habilitar **Row Level Security (RLS)**.
+1. **Base de Datos (Supabase):** Ejecutar el script SQL para añadir la columna `tenant_id` (UUID) a todas las tablas existentes (`clients`, `services`, `appointments`) y habilitar **Row Level Security (RLS)**. La tabla `report_history` ya incluye `tenant_id`. *(La tabla `invoices` no existe en el MVP; si el schema usa `profiles` —p. ej. Supabase Auth— ver README Sección 3.1.)*
 2. **Modelos (SQLAlchemy):** Todos los modelos heredan de `BaseTenantModel`, garantizando que no se pueda crear una tabla sin la relación al tenant.
 3. **Capa CRUD:** Todas las operaciones exigen el `tenant_id` como primer argumento y lo inyectan en las consultas (`.eq("tenant_id", tenant_id)`).
 4. **Logging:** Se implementó un `TenantFilter` con `contextvars` para que cada línea de log incluya el `[Tenant: UUID]`.
@@ -74,13 +75,13 @@ app.py (entry point)
 ## 4. Stripe flow exacto
 
 1. **Intento de Acceso:** El usuario inicia sesión. La UI (`pages/*.py`) verifica `can_access_full_features(tenant_id)`.
-2. **Bloqueo (Paywall):** Si el estado no es `ACTIVE` o `TRIAL`, se llama a `stripe_client.create_checkout_session`.
+2. **Bloqueo (Paywall):** Si el estado no es `active` ni `trial`, se llama a `stripe_client.create_checkout_session`.
 3. **Checkout:** Se genera una URL de Stripe. Es **crítico** que se pase el `tenant_id` en `client_reference_id` y `metadata`. El usuario es redirigido a Stripe.
 4. **Pago Exitoso:** Stripe procesa el pago y dispara un webhook hacia nuestro backend.
 5. **Recepción del Webhook:** Un endpoint (ej. Supabase Edge Function o ruta FastAPI) recibe el POST y llama a `payment_services.process_webhook`.
 6. **Validación y Normalización:** `stripe_client.parse_webhook` verifica la firma criptográfica (`STRIPE_WEBHOOK_SECRET`) y devuelve un `NormalizedEvent`.
 7. **Idempotencia:** Se verifica en la tabla `webhook_events` si el `event_id` ya fue procesado.
-8. **Activación:** Se actualiza `subscription_status = 'ACTIVE'` en la tabla `tenants`. El usuario ya puede acceder a la UI.
+8. **Activación:** Se actualiza `subscription_status = 'active'` en la tabla `tenants`. El usuario ya puede acceder a la UI.
 
 ```
 pages/08_Upgrade.py
@@ -125,7 +126,7 @@ pg_cron (día 1, 9 AM UTC)
       3. analytics/revenue_metrics + retention_metrics
       4. Generar PDF (reportlab, server-side)
       5. Subir a Supabase Storage (bucket: monthly-reports)
-      6. Enviar email (SendGrid)
+      6. Enviar email (Resend)
       7. Registrar en report_history
 ```
 
@@ -133,10 +134,10 @@ pg_cron (día 1, 9 AM UTC)
 
 ## 6. Demo vs Full Mode
 
-Controlado por la bandera `demo_mode` en la tabla `tenants` y el `subscription_status`.
+Controlado por `subscription_status` del tenant. El campo **`demo_mode`** no es una columna en la tabla `tenants`: se calcula en `core/permisos.py` como `get_access_summary(tenant)["demo_mode"]` (equivale a suscripción no activa).
 
 - **Demo Mode:** El usuario inicia sesión con credenciales de prueba (`admin@demo.com`). La UI detecta `is_demo_mode(tenant_id) == True` y muestra banners de advertencia. Los datos mostrados son un dataset estático pre-cargado en la base de datos para ese tenant específico. Las funciones de exportación y reportes mensuales están deshabilitadas.
-- **Full Mode:** Tras pagar en Stripe, el webhook actualiza el estado a `ACTIVE`. Desaparecen los banners, se habilita la creación de registros reales, y el tenant entra en el ciclo del reporte mensual automático. **No hay repositorios ni ramas separadas; es el mismo código.**
+- **Full Mode:** Tras pagar en Stripe, el webhook actualiza el estado a `active`. Desaparecen los banners, se habilita la creación de registros reales, y el tenant entra en el ciclo del reporte mensual automático. **No hay repositorios ni ramas separadas; es el mismo código.**
 
 | Feature | Demo | Full |
 |---------|:----:|:----:|
@@ -152,21 +153,30 @@ Control: `core/permisos.py → get_access_summary(tenant)`
 
 ---
 
-## 7. Variables de entorno requeridas
+## 7. Variables de entorno
+
+**Opcional:** Si no se define `SUPABASE_URL` (o se setea `USE_SUPABASE=false`), la app arranca en modo “Supabase desactivado” y muestra instrucciones. Stripe y Anthropic también son opcionales al inicio.
 
 ```bash
+# Supabase (opcional si USE_SUPABASE=false)
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
+USE_SUPABASE=true
+
+# Stripe, Anthropic, Resend (opcionales para arranque; requeridos para cada feature)
 STRIPE_SECRET_KEY=
 STRIPE_PUBLISHABLE_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PRICE_ID=
 ANTHROPIC_API_KEY=
 SENDGRID_API_KEY=
+
 APP_ENV=production
 APP_BASE_URL=
 ```
+
+**Requisitos de entorno:** Python 3.11 o 3.12 recomendado. En `requirements.txt` se fijan `supabase<2.24` y `altair<5.5` por compatibilidad con Windows y Python 3.14.
 
 ---
 
@@ -197,7 +207,7 @@ Incluye: tablas, índices, RLS policies, tenant demo (Santa Barba).
 
 - **Semana 1 (Infraestructura & Seguridad):** Ejecutar migraciones SQL en Supabase (añadir `tenant_id`, habilitar RLS). Desplegar la Edge Function para el webhook de Stripe. Configurar variables de entorno en producción.
 - **Semana 2 (Pagos & Paywall):** Integrar Stripe Checkout en la UI de Streamlit. Probar el flujo completo de pago → webhook → activación de cuenta con tarjetas de prueba.
-- **Semana 3 (Analíticas & Reportes):** Conectar la capa `analytics/` con datos reales de la DB. Implementar la generación real de PDFs (ReportLab/WeasyPrint) y la integración con un proveedor de email (SendGrid/Resend). Configurar el Cron Job.
+- **Semana 3 (Analíticas & Reportes):** Conectar la capa `analytics/` con datos reales de la DB. Implementar la generación real de PDFs (ReportLab/WeasyPrint) y la integración con Resend para el email del reporte. Configurar el Cron Job.
 - **Semana 4 (Pulido & Lanzamiento):** Configurar el tenant de Demo con datos atractivos. Pruebas de carga ligeras. Onboarding del primer cliente real (Tenant 001).
 
 ---
@@ -221,8 +231,18 @@ Incluye: tablas, índices, RLS policies, tenant demo (Santa Barba).
 - [x] Webhook actualiza `subscription_status` automáticamente
 - [x] Demo mode bloquea features sin pago
 - [x] PDF mensual se genera y sube a Storage
-- [x] Email de reporte se envía vía SendGrid
+- [x] Email de reporte se envía vía Resend
 - [x] Historial de reportes en `report_history`
 - [x] Nuevo negocio se activa sin tocar código
+
+### Completado marzo 2026
+
+- [x] Supabase opcional (`USE_SUPABASE`, sin `SUPABASE_URL`); app arranca con pantalla de instrucciones
+- [x] Constantes `CACHE_TTL_CLIENTS`, `CACHE_TTL_SERVICES`, `CACHE_TTL_KPI`
+- [x] `list_report_history` y `create_report_history_entry` en `core/crud.py`
+- [x] `render_report_history_table` en `UI/tablas.py`; pantalla 07 Insights operativa
+- [x] `is_subscription_active(tenant)` en `core/permisos.py`
+- [x] Dependencias fijadas: `supabase<2.24`, `altair<5.5`; Python 3.11/3.12 recomendado
+- [x] Carga segura de `.env` (UTF-8); mensaje claro si falta paquete `supabase`
 
 
