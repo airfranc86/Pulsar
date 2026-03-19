@@ -18,3 +18,4 @@ coverage/
 *.exe
 .supabase/
 .cursor/
+*config.md
