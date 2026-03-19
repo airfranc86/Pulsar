@@ -1,23 +1,8 @@
 """
+===========================
 Pulsar v1.0 — Entry Point
 ===========================
-Punto de entrada de la aplicación Streamlit multi-tenant.
 
-Responsabilidades:
-  1. Inicializar logging estructurado
-  2. Cargar y validar configuración
-  3. Resolver tenant activo (demo o real)
-  4. Renderizar landing page / redirección al Panel
-
-Arquitectura de sesión:
-  - tenant_id se establece en st.session_state en este módulo
-  - Todas las páginas lo leen de session_state
-  - No se re-evalúa en cada página (single source of truth)
-
-Multi-tenant:
-  - Sin query param → carga tenant demo (DEMO_TENANT_ID)
-  - Con ?tenant=slug → resuelve tenant real por slug
-  - Con ?upgrade=true → redirige a upgrade page
 """
 
 # ─── Cargar .env con tolerancia a encoding (evita utf-8 decode error en Windows) ─
@@ -73,12 +58,6 @@ def _resolve_tenant_id() -> str:
     if "tenant_id" in st.session_state:
         return st.session_state["tenant_id"]
 
-    # Resolución por slug deshabilitada hasta tener Supabase Auth en la app.
-    # Cuando exista JWT en sesión, aquí se podría resolver tenant por slug
-    # solo para usuarios autenticados (app_metadata.tenant_id o get_tenant_by_slug).
-    # query_params = st.query_params
-    # tenant_slug = query_params.get("tenant")
-    # if tenant_slug and st.session_state.get("user_jwt"): ...
 
     st.session_state["tenant_id"] = DEMO_TENANT_ID
     logger.info("tenant_defaulted_to_demo", extra={"tenant_id": DEMO_TENANT_ID})
@@ -88,8 +67,6 @@ def _resolve_tenant_id() -> str:
 def _check_settings() -> bool:
     """
     Verifica que la configuración mínima esté cargada.
-    Con Supabase desactivado (USE_SUPABASE=false o sin SUPABASE_URL) la app arranca
-    y muestra instrucciones en lugar de fallar.
     """
     try:
         from config.settings import settings  # noqa: F401
@@ -119,19 +96,13 @@ def main() -> None:
     # ── Supabase desactivado: mostrar instrucciones y no conectar ─────────────
     if not settings.use_supabase:
         st.info(
-            "⚡ **Supabase desactivado**\n\n"
-            "Para usar el dashboard configurá:\n\n"
-            "- **SUPABASE_URL** y **SUPABASE_ANON_KEY** en `.env` o en "
-            "Streamlit Secrets (`C:\\Users\\Francisco\\.streamlit\\secrets.toml` o "
-            "`.streamlit/secrets.toml` en el proyecto).\n\n"
-            "Para desactivar Supabase a propósito, no hace falta definir nada; "
-            "si querés forzar el modo sin backend, podés setear `USE_SUPABASE=false` en `.env`.",
+            "⚡ **Supabase desactivado**\n\n",
             icon="⚡",
         )
         st.caption(
             "Paths válidos para secrets: "
-            "C:\\Users\\Francisco\\.streamlit\\secrets.toml — "
-            "D:\\Developer\\1Proyectos\\Pulsar v1.0\\.streamlit\\secrets.toml"
+            "***\\.streamlit\\secrets.toml — "
+            "***\\Pulsar v1.0\\.streamlit\\secrets.toml"
         )
         st.stop()
 
@@ -151,11 +122,7 @@ def main() -> None:
     except ImportError as exc:
         if "supabase" in str(exc).lower():
             st.error(
-                "⚠️ **Falta el paquete Supabase**\n\n"
-                "En la carpeta del proyecto, activá el venv y ejecutá:\n\n"
-                "```bash\npip install supabase\n```\n\n"
-                "O instalá todas las dependencias:\n\n"
-                "```bash\npip install -r requirements.txt\n```",
+                "⚠️ **Falta el paquete Supabase**\n\n",
                 icon="⚠️",
             )
         else:
@@ -173,7 +140,7 @@ def main() -> None:
         tenant = get_demo_tenant_fallback(tenant_id)
         st.info(
             "Tenant de ejemplo (sin conexión a la base de datos). "
-            "Configurá SUPABASE_URL y SUPABASE_ANON_KEY para usar datos reales.",
+            "Configurá SUPABASE",
             icon="ℹ️",
         )
 
