@@ -19,3 +19,4 @@ coverage/
 .supabase/
 .cursor/
 *config.md
+*tests/
